@@ -1,0 +1,106 @@
+#
+# [file:#lines]
+# desc
+#
+
+
+# many more come here
+
+
+[http.c:283]
+The strcat() will overflow the pn.You can request a long file name to overflow this.
+<
+    char pn[1024];
+    struct stat st;
+
+    getcwd(pn, sizeof(pn));
+    setenv("DOCUMENT_ROOT", pn, 1);
+
+    strcat(pn, name);
+
+>
+
+[http.c:359]
+The dir_join will overflow name.You can request a long directory path name to overlow this.
+<
+    char name[1024];
+    struct stat st;
+    int i;
+
+    for (i = 0; indices[i]; i++) {
+        dir_join(name, pn, indices[i]);
+	
+>
+
+[https.c:438]
+The url_decoder will overflow dst.You can overflow value buffer in http_request_headers.
+<
+   static char buf[8192];      /* static variables are not on the stack */
+    int i;
+    char value[512];
+    char envvar[512];
+
+    /* For lab 2: don't remove this line. */
+    touch("http_request_headers");
+
+    /* Now parse HTTP headers */
+    for (;;)
+    {
+        if (http_read_line(fd, buf, sizeof(buf)) < 0)
+            return "Socket IO error";
+
+        if (buf[0] == '\0')     /* end of headers */
+            break;
+
+        /* Parse things like "Cookie: foo bar" */
+        char *sp = strchr(buf, ' ');
+        if (!sp)
+            return "Header parse error (1)";
+        *sp = '\0';
+        sp++;
+
+        /* Strip off the colon, making sure it's there */
+        if (strlen(buf) == 0)
+            return "Header parse error (2)";
+
+        char *colon = &buf[strlen(buf) - 1];
+        if (*colon != ':')
+            return "Header parse error (3)";
+        *colon = '\0';
+
+        /* Set the header name to uppercase and replace hyphens with underscores */
+        for (i = 0; i < strlen(buf); i++) {
+            buf[i] = toupper(buf[i]);
+            if (buf[i] == '-')
+                buf[i] = '_';
+        }
+
+        /* Decode URL escape sequences in the value */
+        url_decode(value, sp);
+	
+>
+
+[zookd.c:70]
+The reqpath will be overflowed by http_request_line.
+<
+    char reqpath[2048];
+    const char *errmsg;
+    int i;
+
+    /* get the request line */
+    if ((errmsg = http_request_line(fd, reqpath, env, &env_len)))
+        return http_err(fd, 500, "http_request_line: %s", errmsg);
+
+>
+
+[http.c:96]
+The env buffer will be overflowed by http_request_line too.Althougth i donot know
+(by sprintf function) whether it may help the attack.But stack canary maynot protect this.
+<
+    static char env[8192];  /* static variables are not on the stack */	
+    envp += sprintf(envp, "REQUEST_METHOD=%s", buf) + 1;
+    envp += sprintf(envp, "SERVER_PROTOCOL=%s", sp2) + 1;
+
+>
+
+
