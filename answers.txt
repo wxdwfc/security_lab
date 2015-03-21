@@ -1,1 +1,20 @@
 ## Place your answers here.
+
+exercise 2:
+    In 2a i overflow the ret address of http_serve.
+    In 2b i overwrite the handler function pointer which can be called by http_serve.   
+
+exercise 3:
+   Some can some cannot.For example,the last one which overflow an address on code segment which can not be used in this execieses.
+
+exercies 5:
+
+1. The attacker can access the files on the server based on the fact the serve donot check the .. symbols in request path.(The http_serve function only use a strcat(dir,name) to combine the name.Because usually the server's directory is known to the public so the attacker can get the files.
+   You can explicit check the name when passed it to http_serve.
+   The limitations is that you gotta know what you are looking for and excatly where they are.
+
+2. You can use a non-exesists file to the server,the server will return the path where the server exesists.The attacker can use this path to make attacks described above.
+   You can donot print the full name of path to the client.
+   The limitation is that it must be worked combined with the vulnibalities above.
+
+
