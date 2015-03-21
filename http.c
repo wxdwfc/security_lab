@@ -61,7 +61,7 @@ int http_read_line(int fd, char *buf, size_t size)
     return -1;
 }
 
-const char *http_request_line(int fd, char *reqpath, char *env, size_t *env_len)
+const char *http_request_line(int fd, char *reqpath, char *env, size_t *env_len,int len,int len2)
 {
     static char buf[8192];      /* static variables are not on the stack */
     char *sp1, *sp2, *qp, *envp = env;
@@ -90,23 +90,34 @@ const char *http_request_line(int fd, char *reqpath, char *env, size_t *env_len)
     /* We only support GET and POST requests */
     if (strcmp(buf, "GET") && strcmp(buf, "POST"))
         return "Unsupported request (not GET or POST)";
-
-    envp += sprintf(envp, "REQUEST_METHOD=%s", buf) + 1;
-    envp += sprintf(envp, "SERVER_PROTOCOL=%s", sp2) + 1;
+    
+    int length = len2;
+    int gap = snprintf(envp, length,"REQUEST_METHOD=%s", buf) + 1;
+    envp += gap;
+    length -= gap;
+    gap = snprintf(envp, length,"SERVER_PROTOCOL=%s", sp2) + 1;
+    envp += gap;
+    length -= gap;
 
     /* parse out query string, e.g. "foo.py?user=bob" */
     if ((qp = strchr(sp1, '?')))
     {
         *qp = '\0';
-        envp += sprintf(envp, "QUERY_STRING=%s", qp + 1) + 1;
+        gap += snprintf(envp,length, "QUERY_STRING=%s", qp + 1) + 1;
+	length -= gap;
+	envp += gap;
     }
 
     /* decode URL escape sequences in the requested path into reqpath */
-    url_decode(reqpath, sp1);
+    url_decode(reqpath, sp1,len);
 
-    envp += sprintf(envp, "REQUEST_URI=%s", reqpath) + 1;
+    gap = snprintf(envp,length, "REQUEST_URI=%s", reqpath) + 1;
+    envp += gap;
+    length -= gap;
 
-    envp += sprintf(envp, "SERVER_NAME=zoobar.org") + 1;
+    gap = snprintf(envp, length,"SERVER_NAME=zoobar.org") + 1;
+    envp += gap;
+    length -= gap;
 
     *envp = 0;
     *env_len = envp - env + 1;
@@ -156,7 +167,7 @@ const char *http_request_headers(int fd)
         }
 
         /* Decode URL escape sequences in the value */
-        url_decode(value, sp);
+        url_decode(value, sp,512);
 
         /* Store header in env. variable for application code */
         /* Some special headers don't use the HTTP_ prefix. */
@@ -279,7 +290,7 @@ void http_serve(int fd, const char *name)
     getcwd(pn, sizeof(pn));
     setenv("DOCUMENT_ROOT", pn, 1);
 
-    strcat(pn, name);
+    strncat(pn, name,1024 - strlen(pn));
     split_path(pn);
 
     if (!stat(pn, &st))
@@ -294,7 +305,6 @@ void http_serve(int fd, const char *name)
     }
 
     handler(fd, pn);
-    fprintf(stdout,"this %s\n",pn);
 }
 
 void http_serve_none(int fd, const char *pn)
@@ -341,11 +351,11 @@ void http_serve_file(int fd, const char *pn)
     close(filefd);
 }
 
-void dir_join(char *dst, const char *dirname, const char *filename) {
-    strcpy(dst, dirname);
-    if (dst[strlen(dst) - 1] != '/')
-        strcat(dst, "/");
-    strcat(dst, filename);
+void dir_join(char *dst, const char *dirname, const char *filename,int len) {
+  strncpy(dst, dirname,len);
+  if (dst[strlen(dst) - 1] != '/')
+    strncat(dst, "/",len - strlen(dst));
+  strncat(dst, filename,strlen(dst));
 }
 
 void http_serve_directory(int fd, const char *pn) {
@@ -356,10 +366,10 @@ void http_serve_directory(int fd, const char *pn) {
     int i;
 
     for (i = 0; indices[i]; i++) {
-        dir_join(name, pn, indices[i]);
+      dir_join(name, pn, indices[i],1024);
         if (stat(name, &st) == 0 && S_ISREG(st.st_mode)) {
-            dir_join(name, getenv("SCRIPT_NAME"), indices[i]);
-            break;
+	  dir_join(name, getenv("SCRIPT_NAME"), indices[i],strlen(name));
+	  break;
         }
     }
 
@@ -435,9 +445,10 @@ void http_serve_executable(int fd, const char *pn)
     }
 }
 
-void url_decode(char *dst, const char *src)
+void url_decode(char *dst, const char *src,int len)
 {
-    for (;;)
+  int c = 0;
+    for (;c < len;)
     {
         if (src[0] == '%' && src[1] && src[2])
         {
@@ -464,6 +475,7 @@ void url_decode(char *dst, const char *src)
         }
 
         dst++;
+	c++;
     }
 }
 
